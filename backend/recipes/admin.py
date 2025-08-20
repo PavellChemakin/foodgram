@@ -1,24 +1,9 @@
-"""Administration configuration for recipes models.
-
-This module registers models with the Django admin and customises
-their representation for ease of management. Search fields, filters
-and inline editing are provided in accordance with the project
-requirements.
-"""
-
 from __future__ import annotations
 
 from django.contrib import admin
 
-from .models import (
-    Favorite,
-    Ingredient,
-    Recipe,
-    RecipeIngredient,
-    ShoppingCart,
-    Subscription,
-    Tag,
-)
+from .models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                     ShoppingCart, Subscription, Tag)
 
 
 @admin.register(Tag)

@@ -1,14 +1,3 @@
-"""Django settings for the Foodgram project.
-
-This configuration file defines the majority of server‑side settings used
-by the Foodgram service. The project is designed to run in both a
-local development environment (using SQLite) and a production
-environment (using PostgreSQL). Configuration values can be
-customised via environment variables to facilitate deployment in
-different contexts. See the README for details on configuring a
-production deployment with Docker, Gunicorn and nginx.
-"""
-
 from __future__ import annotations
 
 import os
@@ -16,20 +5,14 @@ from pathlib import Path
 
 from django.core.management.utils import get_random_secret_key
 
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', get_random_secret_key())
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG: bool = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS: list[str] = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
-
-# Application definition
 
 INSTALLED_APPS: list[str] = [
     'django.contrib.admin',
@@ -76,11 +59,7 @@ TEMPLATES: list[dict[str, object]] = [
 WSGI_APPLICATION = 'foodgram.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/stable/ref/settings/#databases
-
 if os.environ.get('DB_ENGINE'):
-    # Use environment variables for a production PostgreSQL database
     DATABASES = {
         'default': {
             'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
@@ -92,7 +71,6 @@ if os.environ.get('DB_ENGINE'):
         }
     }
 else:
-    # Fallback to SQLite for development
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -101,8 +79,6 @@ else:
     }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS: list[dict[str, str]] = [
     {
@@ -120,10 +96,8 @@ AUTH_PASSWORD_VALIDATORS: list[dict[str, str]] = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/stable/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru-ru'
 
 TIME_ZONE = 'UTC'
 
@@ -132,9 +106,6 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/stable/howto/static-files/
-
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 
@@ -142,13 +113,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-# Authentication
 AUTH_USER_MODEL = 'users.User'
 
 REST_FRAMEWORK = {
@@ -162,7 +128,6 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 6,
 }
 
-# Djoser configuration
 DJOSER = {
     'LOGIN_FIELD': 'email',
     'USER_CREATE_PASSWORD_RETYPE': True,

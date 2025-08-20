@@ -15,19 +15,16 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Djoser provides ``/users/`` and related endpoints for user
-    # registration, activation, password reset and profile retrieval.
-    path('api/', include('djoser.urls')),  # user registration & management
-    path('api/', include('djoser.urls.authtoken')),  # token auth
-    # Application API endpoints
+    path('api/', include('djoser.urls')),
+    path('api/', include('djoser.urls.authtoken')),
     path('api/', include('recipes.urls')),
-    path('api/', include('users.urls')),  # subscription endpoints
+    path('api/', include('users.urls')),
 ]
 
-# During development serve static and media files from Django.
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL,
+                          document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL,
+                          document_root=settings.MEDIA_ROOT)

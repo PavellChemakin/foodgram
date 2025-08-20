@@ -1,50 +1,43 @@
-"""Serialisers for the custom user model.
-
-These classes transform user instances to and from JSON. They are
-used by Djoser to expose user registration and profile endpoints.
-The serialisers include a computed ``is_subscribed`` field which
-indicates whether the requesting user follows a particular author.
-"""
-
 from __future__ import annotations
 
 from typing import Any, Dict
 
 from django.contrib.auth import get_user_model
-from rest_framework import serializers
-
 from recipes.models import Subscription
+from rest_framework import serializers
 
 User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for representing users in API responses."""
+    """Сериализатор пользователя."""
 
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('email', 'id', 'username', 'first_name', 'last_name', 'is_subscribed')
+        fields = ('email', 'id', 'username', 'first_name',
+                  'last_name', 'is_subscribed')
 
     def get_is_subscribed(self, obj: User) -> bool:
         request = self.context.get('request')
         if not request or request.user.is_anonymous:
             return False
-        return Subscription.objects.filter(user=request.user, author=obj).exists()
+        return Subscription.objects.filter(user=request.user,
+                                           author=obj).exists()
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    """Serializer for user registration."""
+    """Сериализатор создания пользователя."""
 
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ('email', 'id', 'username', 'first_name', 'last_name', 'password')
+        fields = ('email', 'id', 'username', 'first_name',
+                  'last_name', 'password')
 
     def create(self, validated_data: Dict[str, Any]) -> User:
-        # Use Django's built‑in user creation to hash the password
         user = User.objects.create_user(
             email=validated_data['email'],
             username=validated_data['username'],
@@ -56,10 +49,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value: str) -> str:
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('A user with this email already exists.')
+            raise serializers.ValidationError(
+                'Пользователь с таким email уже существует.')
         return value
 
     def validate_username(self, value: str) -> str:
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError('A user with this username already exists.')
+            raise serializers.ValidationError(
+                'Пользователь с таким username уже существует.')
         return value

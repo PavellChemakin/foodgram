@@ -1,53 +1,27 @@
-"""Serialisers for converting model instances to and from JSON.
-
-These classes define how recipes, ingredients and tags are exposed via
-the REST API. Nested representations are used for recipe retrieval,
-while write operations accept flat JSON that is converted into the
-appropriate related objects. A custom field handles base64‑encoded
-images produced by the SPA frontend.
-"""
-
 from __future__ import annotations
 
 import base64
 import imghdr
 import uuid
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List
 
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.db.models import Exists, OuterRef
 from rest_framework import serializers
-
-from .models import (
-    Favorite,
-    Ingredient,
-    Recipe,
-    RecipeIngredient,
-    ShoppingCart,
-    Subscription,
-    Tag,
-)
 from users.serializers import UserSerializer
+
+from .models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                     ShoppingCart, Subscription, Tag)
 
 
 class Base64ImageField(serializers.ImageField):
-    """A field that decodes base64‑encoded images into Django files.
-
-    The SPA frontend sends images as base64 strings. This custom field
-    intercepts those strings and decodes them into a ``ContentFile`` so
-    that Django's ``ImageField`` can process and store them correctly.
-    If the input is not a base64 string it is passed through to the
-    default ``ImageField`` for validation.
-    """
+    """Поле для base64‑изображений."""
 
     def to_internal_value(self, data: Any) -> Any:
-        # Check if the incoming data is a base64 encoded string
         if isinstance(data, str) and data.startswith('data:image'):
             format_str, img_str = data.split(';base64,')
             img_format = format_str.split('/')[-1]
             decoded = base64.b64decode(img_str)
-            # Attempt to detect file extension if not provided
             file_ext = imghdr.what(None, decoded) or img_format
             file_name = f'{uuid.uuid4()}.{file_ext}'
             data = ContentFile(decoded, name=file_name)
@@ -55,7 +29,7 @@ class Base64ImageField(serializers.ImageField):
 
 
 class TagSerializer(serializers.ModelSerializer):
-    """Serialises tag objects for read‑only operations."""
+    """Сериализатор тега."""
 
     class Meta:
         model = Tag
@@ -63,7 +37,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class IngredientSerializer(serializers.ModelSerializer):
-    """Serialises ingredients for list and detail views."""
+    """Сериализатор ингредиента."""
 
     class Meta:
         model = Ingredient
@@ -71,11 +45,12 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class IngredientInRecipeSerializer(serializers.ModelSerializer):
-    """Represents ingredients within a recipe including their amount."""
+    """Ингредиент в рецепте."""
 
     id = serializers.ReadOnlyField(source='ingredient.id')
     name = serializers.ReadOnlyField(source='ingredient.name')
-    measurement_unit = serializers.ReadOnlyField(source='ingredient.measurement_unit')
+    measurement_unit = serializers.ReadOnlyField(
+        source='ingredient.measurement_unit')
 
     class Meta:
         model = RecipeIngredient
@@ -83,7 +58,7 @@ class IngredientInRecipeSerializer(serializers.ModelSerializer):
 
 
 class RecipeShortSerializer(serializers.ModelSerializer):
-    """A compact representation of a recipe used in subscriptions."""
+    """Краткий рецепт."""
 
     image = serializers.ImageField(read_only=True)
 
@@ -93,7 +68,7 @@ class RecipeShortSerializer(serializers.ModelSerializer):
 
 
 class RecipeReadSerializer(serializers.ModelSerializer):
-    """Read‑only serialiser for retrieving recipe details."""
+    """Сериализатор чтения рецепта."""
 
     tags = TagSerializer(many=True, read_only=True)
     author = UserSerializer(read_only=True)
@@ -132,7 +107,7 @@ class RecipeReadSerializer(serializers.ModelSerializer):
 
 
 class IngredientWriteSerializer(serializers.ModelSerializer):
-    """Helper serialiser for creating and updating recipe ingredients."""
+    """Сериализатор ингредиента при записи."""
 
     id = serializers.IntegerField()
     amount = serializers.IntegerField()
@@ -143,12 +118,13 @@ class IngredientWriteSerializer(serializers.ModelSerializer):
 
     def validate_amount(self, value: int) -> int:
         if value <= 0:
-            raise serializers.ValidationError('Amount must be greater than zero.')
+            raise serializers.ValidationError(
+                'Количество должно быть больше нуля.')
         return value
 
 
 class RecipeWriteSerializer(serializers.ModelSerializer):
-    """Serialiser for creating and updating recipes."""
+    """Сериализатор записи рецепта."""
 
     ingredients = IngredientWriteSerializer(many=True)
     tags = serializers.PrimaryKeyRelatedField(
@@ -167,17 +143,20 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             'cooking_time',
         )
 
-    def validate_ingredients(self, value: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def validate_ingredients(self,
+                             value: List[Dict[str,
+                                              Any]]) -> List[Dict[str, Any]]:
         if not value:
-            raise serializers.ValidationError('At least one ingredient is required.')
+            raise serializers.ValidationError('Нужен хотя бы один ингредиент.')
         ids = [item['id'] for item in value]
         if len(ids) != len(set(ids)):
-            raise serializers.ValidationError('Duplicate ingredients are not allowed.')
+            raise serializers.ValidationError(
+                'Дубли ингредиентов не допускаются.')
         return value
 
     def validate_tags(self, value: List[Tag]) -> List[Tag]:
         if not value:
-            raise serializers.ValidationError('At least one tag is required.')
+            raise serializers.ValidationError('Нужен хотя бы один тег.')
         return value
 
     @transaction.atomic
@@ -191,10 +170,10 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return recipe
 
     @transaction.atomic
-    def update(self, instance: Recipe, validated_data: Dict[str, Any]) -> Recipe:
+    def update(self, instance: Recipe,
+               validated_data: Dict[str, Any]) -> Recipe:
         ingredients_data = validated_data.pop('ingredients', None)
         tags = validated_data.pop('tags', None)
-        # Update simple fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if tags is not None:
@@ -205,7 +184,8 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-    def _save_ingredients(self, recipe: Recipe, ingredients_data: Iterable[Dict[str, Any]]) -> None:
+    def _save_ingredients(self, recipe: Recipe,
+                          ingredients_data: Iterable[Dict[str, Any]]) -> None:
         objs: List[RecipeIngredient] = []
         for item in ingredients_data:
             ingredient = Ingredient.objects.get(pk=item['id'])
@@ -227,13 +207,15 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    """Serialises user subscriptions with nested recipes."""
+    """Сериализатор пользовательских подпискок с вложенными рецептами."""
 
     email = serializers.EmailField(source='author.email', read_only=True)
     id = serializers.IntegerField(source='author.id', read_only=True)
     username = serializers.CharField(source='author.username', read_only=True)
-    first_name = serializers.CharField(source='author.first_name', read_only=True)
-    last_name = serializers.CharField(source='author.last_name', read_only=True)
+    first_name = serializers.CharField(source='author.first_name',
+                                       read_only=True)
+    last_name = serializers.CharField(source='author.last_name',
+                                      read_only=True)
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
 

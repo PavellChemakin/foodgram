@@ -11,7 +11,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY backend /app
 
-# Collect static files at build time
 RUN python manage.py collectstatic --noinput
 
 CMD ["gunicorn", "foodgram.wsgi:application", "--bind", "0.0.0.0:8000"]
