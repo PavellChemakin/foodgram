@@ -79,7 +79,6 @@ else:
     }
 
 
-
 AUTH_PASSWORD_VALIDATORS: list[dict[str, str]] = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -94,7 +93,6 @@ AUTH_PASSWORD_VALIDATORS: list[dict[str, str]] = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
 
 
 LANGUAGE_CODE = 'ru-ru'
