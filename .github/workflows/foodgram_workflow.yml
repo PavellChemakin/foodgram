@@ -126,19 +126,45 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             set -euo pipefail
+            unset DOCKER_HOST
             cd /home/${{ secrets.USER }}/foodgram
-            sudo systemctl is-active --quiet docker || sudo systemctl start docker
+
+            ensure_docker() {
+              sudo systemctl start docker || true
+              for i in $(seq 1 30); do
+                sudo test -S /var/run/docker.sock && sudo docker info >/dev/null 2>&1 && return 0
+                sudo systemctl restart docker || true
+                sleep 2
+              done
+              return 1
+            }
+
+            ensure_docker
 
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
 
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml pull
+
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
 
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml exec -T db bash -lc 'until pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done'
+
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
+
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml exec -T backend bash -lc 'rm -rf /backend_static/* && cp -r /app/static/. /backend_static/'
+
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml exec -T frontend bash -lc 'rm -rf /static/* && cp -r /app/build/static/. /static/'
+
+            ensure_docker
             sudo docker compose -f docker-compose.production.yml exec -T gateway sh -lc 'for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1'
 
             curl -sfI http://127.0.0.1:8000/ >/dev/null
