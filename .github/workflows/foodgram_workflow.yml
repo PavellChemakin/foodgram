@@ -68,16 +68,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
-
-      - run: cd frontend && npm install --no-audit --no-fund
+      - run: cd frontend && npm ci --legacy-peer-deps --no-audit --no-fund
       - run: cd frontend && npm run test --if-present || echo 'No frontend tests'
-
       - uses: docker/setup-buildx-action@v2
       - uses: docker/login-action@v2
         with:
@@ -183,6 +180,7 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
+        with:
           script: |
             set -euxo pipefail
             sudo flock -w 900 /var/lock/deploy.lock bash -lc '
@@ -190,17 +188,12 @@ jobs:
               sudo docker compose -f docker-compose.production.yml pull
               sudo docker compose -f docker-compose.production.yml down --remove-orphans || true
               sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans || true
-
               sudo docker compose -f docker-compose.production.yml exec -T db bash -lc "until pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"; do sleep 1; done"
-
               sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
               sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
               sudo docker compose -f docker-compose.production.yml exec -T backend bash -lc "rm -rf /backend_static/* && cp -r /app/static/. /backend_static/"
-
               sudo docker compose -f docker-compose.production.yml exec -T frontend bash -lc "rm -rf /static/* && cp -r /app/build/static/. /static/"
-
               sudo docker compose -f docker-compose.production.yml exec -T gateway sh -lc "for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1"
-
               sudo curl -sfI http://127.0.0.1:8000/ >/dev/null
             '
 
