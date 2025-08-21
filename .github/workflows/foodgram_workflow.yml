@@ -75,7 +75,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
 
-      - run: cd frontend && npm ci --legacy-peer-deps
+      - run: cd frontend && npm install --no-audit --no-fund
       - run: cd frontend && npm run test --if-present || echo 'No frontend tests'
 
       - uses: docker/setup-buildx-action@v2
