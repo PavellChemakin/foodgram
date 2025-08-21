@@ -114,10 +114,8 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: |
-            docker-compose.production.yml
-            scripts/docker_ensure.sh
-          target: /home/${{ secrets.USER }}/foodgram
+          source: "docker-compose.production.yml,scripts/docker_ensure.sh"
+          target: "/home/${{ secrets.USER }}/foodgram"
           overwrite: true
           strip_components: 0
 
