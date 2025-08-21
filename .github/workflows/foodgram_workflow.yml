@@ -114,10 +114,9 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "docker-compose.production.yml,scripts/docker_ensure.sh"
+          source: "docker-compose.production.yml"
           target: "/home/${{ secrets.USER }}/foodgram"
           overwrite: true
-          strip_components: 0
 
       - uses: appleboy/ssh-action@master
         with:
@@ -127,34 +126,82 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             set -euo pipefail
-            cd /home/${{ secrets.USER }}/foodgram
-            sudo chown -R ${{ secrets.USER }}:${{ secrets.USER }} .
-            sudo -iu ${{ secrets.USER }} bash -lc 'chmod +x scripts/docker_ensure.sh && ./scripts/docker_ensure.sh'
-
-      - uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          script: |
-            set -euo pipefail
+            sudo mkdir -p /home/${{ secrets.USER }}/foodgram
+            sudo chown -R ${{ secrets.USER }}:${{ secrets.USER }} /home/${{ secrets.USER }}/foodgram
             sudo -iu ${{ secrets.USER }} bash -lc '
               set -euo pipefail
+              mkdir -p ~/foodgram/scripts ~/.config/foodgram
+              cat > ~/foodgram/scripts/docker_ensure.sh <<'\''SH'\''
+#!/usr/bin/env bash
+set -euo pipefail
+USER_HOME="$HOME"
+CFG_DIR="$USER_HOME/.config/foodgram"
+ENV_FILE="$CFG_DIR/env"
+mkdir -p "$CFG_DIR" "$USER_HOME/foodgram"
+use_system_docker() {
+  if command -v sudo >/dev/null 2>&1; then
+    sudo systemctl enable docker.service docker.socket >/dev/null 2>&1 || true
+    sudo systemctl start docker.service >/dev/null 2>&1 || true
+    for i in $(seq 1 30); do
+      if sudo docker info >/dev/null 2>&1; then
+        printf "USE_SUDO=1\nDOCKER_HOST=\n" > "$ENV_FILE"
+        return 0
+      fi
+      sleep 1
+    done
+  fi
+  return 1
+}
+use_rootless_docker() {
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -y
+    sudo apt-get install -y docker-ce-rootless-extras uidmap dbus-user-session fuse-overlayfs
+  fi
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+  mkdir -p "$XDG_RUNTIME_DIR"
+  if ! command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
+    return 1
+  fi
+  if [ ! -S "$XDG_RUNTIME_DIR/docker.sock" ]; then
+    dockerd-rootless-setuptool.sh install || true
+  fi
+  loginctl enable-linger "$(whoami)" >/dev/null 2>&1 || true
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  systemctl --user enable --now docker >/dev/null 2>&1 || true
+  export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+  for i in $(seq 1 60); do
+    if docker info >/dev/null 2>&1; then
+      printf "USE_SUDO=0\nDOCKER_HOST=%s\n" "$DOCKER_HOST" > "$ENV_FILE"
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+if use_system_docker; then exit 0; fi
+if use_rootless_docker; then exit 0; fi
+echo "Docker daemon is not available (system and rootless both failed)." >&2
+exit 1
+SH
+              chmod +x ~/foodgram/scripts/docker_ensure.sh
+              ~/foodgram/scripts/docker_ensure.sh
+
               cd ~/foodgram
               . ~/.config/foodgram/env
               [ -n "${DOCKER_HOST:-}" ] && export DOCKER_HOST="$DOCKER_HOST"
-              DOCKER="docker"; [ "${USE_SUDO:-0}" = "1" ] && DOCKER="sudo docker"
+              DOCKER=docker
+              [ "${USE_SUDO:-0}" = "1" ] && DOCKER="sudo docker"
+
               echo "${{ secrets.DOCKER_PASSWORD }}" | $DOCKER login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
               $DOCKER compose -f docker-compose.production.yml pull
               $DOCKER compose -f docker-compose.production.yml down --remove-orphans || true
               $DOCKER compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans || true
-              $DOCKER compose -f docker-compose.production.yml exec -T db bash -lc "until pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"; do sleep 1; done"
+              $DOCKER compose -f docker-compose.production.yml exec -T db bash -lc '\''for i in $(seq 1 60); do pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" && exit 0 || sleep 1; done; exit 1'\''
               $DOCKER compose -f docker-compose.production.yml exec -T backend python manage.py migrate
               $DOCKER compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-              $DOCKER compose -f docker-compose.production.yml exec -T backend bash -lc "rm -rf /backend_static/* && cp -r /app/static/. /backend_static/"
-              $DOCKER compose -f docker-compose.production.yml exec -T frontend bash -lc "rm -rf /static/* && cp -r /app/build/static/. /static/"
-              $DOCKER compose -f docker-compose.production.yml exec -T gateway sh -lc "for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1"
+              $DOCKER compose -f docker-compose.production.yml exec -T backend bash -lc '\''rm -rf /backend_static/* && cp -r /app/static/. /backend_static/'\''
+              $DOCKER compose -f docker-compose.production.yml exec -T frontend bash -lc '\''rm -rf /static/* && cp -r /app/build/static/. /static/'\''
+              $DOCKER compose -f docker-compose.production.yml exec -T gateway sh -lc '\''for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1'\''
               curl -sfI http://127.0.0.1:8000/ >/dev/null
             '
 
