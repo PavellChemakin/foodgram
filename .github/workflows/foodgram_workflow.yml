@@ -180,7 +180,6 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-        with:
           script: |
             set -euxo pipefail
             sudo flock -w 900 /var/lock/deploy.lock bash -lc '
