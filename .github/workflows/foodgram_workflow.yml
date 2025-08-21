@@ -108,31 +108,18 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          script: |
-            set -euo pipefail
-            sudo mkdir -p /home/${{ secrets.USER }}/foodgram
-            sudo chown -R ${{ secrets.USER }}:${{ secrets.USER }} /home/${{ secrets.USER }}/foodgram
-            sudo systemctl enable docker.service docker.socket || true
-            sudo systemctl start docker.service || true
-            for i in $(seq 1 60); do sudo docker info >/dev/null 2>&1 && break; sleep 2; done
-            sudo docker info >/dev/null 2>&1
-            rm -f /home/${{ secrets.USER }}/foodgram/docker-compose.production.yml
-
       - uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "docker-compose.production.yml"
-          target: "/home/${{ secrets.USER }}/foodgram"
+          source: |
+            docker-compose.production.yml
+            scripts/docker_ensure.sh
+          target: /home/${{ secrets.USER }}/foodgram
           overwrite: true
+          strip_components: 0
 
       - uses: appleboy/ssh-action@master
         with:
@@ -143,17 +130,35 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/${{ secrets.USER }}/foodgram
-            echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
-            sudo docker compose -f docker-compose.production.yml pull
-            sudo docker compose -f docker-compose.production.yml down --remove-orphans || true
-            sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans || true
-            sudo docker compose -f docker-compose.production.yml exec -T db bash -lc "until pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"; do sleep 1; done"
-            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
-            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-            sudo docker compose -f docker-compose.production.yml exec -T backend bash -lc "rm -rf /backend_static/* && cp -r /app/static/. /backend_static/"
-            sudo docker compose -f docker-compose.production.yml exec -T frontend bash -lc "rm -rf /static/* && cp -r /app/build/static/. /static/"
-            sudo docker compose -f docker-compose.production.yml exec -T gateway sh -lc "for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1"
-            curl -sfI http://127.0.0.1:8000/ >/dev/null
+            sudo chown -R ${{ secrets.USER }}:${{ secrets.USER }} .
+            sudo -iu ${{ secrets.USER }} bash -lc 'chmod +x scripts/docker_ensure.sh && ./scripts/docker_ensure.sh'
+
+      - uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            set -euo pipefail
+            sudo -iu ${{ secrets.USER }} bash -lc '
+              set -euo pipefail
+              cd ~/foodgram
+              . ~/.config/foodgram/env
+              [ -n "${DOCKER_HOST:-}" ] && export DOCKER_HOST="$DOCKER_HOST"
+              DOCKER="docker"; [ "${USE_SUDO:-0}" = "1" ] && DOCKER="sudo docker"
+              echo "${{ secrets.DOCKER_PASSWORD }}" | $DOCKER login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
+              $DOCKER compose -f docker-compose.production.yml pull
+              $DOCKER compose -f docker-compose.production.yml down --remove-orphans || true
+              $DOCKER compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans || true
+              $DOCKER compose -f docker-compose.production.yml exec -T db bash -lc "until pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"; do sleep 1; done"
+              $DOCKER compose -f docker-compose.production.yml exec -T backend python manage.py migrate
+              $DOCKER compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+              $DOCKER compose -f docker-compose.production.yml exec -T backend bash -lc "rm -rf /backend_static/* && cp -r /app/static/. /backend_static/"
+              $DOCKER compose -f docker-compose.production.yml exec -T frontend bash -lc "rm -rf /static/* && cp -r /app/build/static/. /static/"
+              $DOCKER compose -f docker-compose.production.yml exec -T gateway sh -lc "for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1"
+              curl -sfI http://127.0.0.1:8000/ >/dev/null
+            '
 
   notify:
     runs-on: ubuntu-latest
