@@ -123,7 +123,10 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
             fi
-            sudo systemctl enable --now docker
+            sudo systemctl enable docker.service docker.socket || true
+            sudo systemctl start docker.service || true
+            for i in $(seq 1 60); do sudo docker info >/dev/null 2>&1 && break; sleep 1; done
+            sudo docker info >/dev/null 2>&1
             sudo usermod -aG docker ${{ secrets.USER }} || true
             sudo mkdir -p /home/${{ secrets.USER }}/foodgram
             sudo chown -R ${{ secrets.USER }}:${{ secrets.USER }} /home/${{ secrets.USER }}/foodgram
@@ -140,6 +143,7 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             set -euxo pipefail
+            for i in $(seq 1 60); do sudo systemctl start docker.service || true; sudo docker info >/dev/null 2>&1 && break; sleep 1; done
             sudo flock -w 900 /var/lock/deploy.lock bash -lc '
               mkdir -p /home/${{ secrets.USER }}/foodgram
               cd /home/${{ secrets.USER }}/foodgram
@@ -166,7 +170,9 @@ jobs:
             set -euxo pipefail
             sudo mkdir -p /home/${{ secrets.USER }}/foodgram
             sudo chown -R ${{ secrets.USER }}:${{ secrets.USER }} /home/${{ secrets.USER }}/foodgram
-            sudo systemctl enable --now docker
+            sudo systemctl enable docker.service docker.socket || true
+            sudo systemctl start docker.service || true
+            for i in $(seq 1 60); do sudo docker info >/dev/null 2>&1 && break; sleep 1; done
             rm -f /home/${{ secrets.USER }}/foodgram/docker-compose.production.yml
 
       - uses: appleboy/scp-action@master
@@ -189,22 +195,19 @@ jobs:
             set -euxo pipefail
             sudo flock -w 900 /var/lock/deploy.lock bash -lc '
               cd /home/${{ secrets.USER }}/foodgram
-              sudo systemctl enable --now docker
+              sudo systemctl start docker.service || true
+              for i in $(seq 1 60); do sudo docker info >/dev/null 2>&1 && break; sleep 1; done
+              echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
               sudo docker compose -f docker-compose.production.yml pull
               sudo docker compose -f docker-compose.production.yml down --remove-orphans || true
               sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans || true
-
               sudo docker compose -f docker-compose.production.yml exec -T db bash -lc "until pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"; do sleep 1; done"
-
               sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
               sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
               sudo docker compose -f docker-compose.production.yml exec -T backend bash -lc "rm -rf /backend_static/* && cp -r /app/static/. /backend_static/"
-
               sudo docker compose -f docker-compose.production.yml exec -T frontend bash -lc "rm -rf /static/* && cp -r /app/build/static/. /static/"
-
               sudo docker compose -f docker-compose.production.yml exec -T gateway sh -lc "for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1"
-
-              sudo curl -sfI http://127.0.0.1:8000/ >/dev/null
+              curl -sfI http://127.0.0.1:8000/ >/dev/null
             '
 
   notify:
