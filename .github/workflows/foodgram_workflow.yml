@@ -108,6 +108,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            set -euo pipefail
+            mkdir -p /home/${{ secrets.USER }}/foodgram
+            chown -R ${{ secrets.USER }}:${{ secrets.USER }} /home/${{ secrets.USER }}/foodgram
+
       - uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -129,36 +140,22 @@ jobs:
             unset DOCKER_HOST
             cd /home/${{ secrets.USER }}/foodgram
 
-            wait_docker() {
-              if sudo docker info >/dev/null 2>&1; then return 0; fi
-              if sudo systemctl is-active --quiet docker; then
-                for i in $(seq 1 10); do
-                  sudo test -S /var/run/docker.sock && sudo docker info >/dev/null 2>&1 && return 0
-                  sleep 1
-                done
-              else
-                sudo systemctl reset-failed docker || true
-                sudo systemctl start containerd || true
-                sudo systemctl restart docker || sudo systemctl start docker || true
-              fi
-              for i in $(seq 1 20); do sudo docker info >/dev/null 2>&1 && return 0 || sleep 1; done
-              echo "Docker failed to start" >&2
-              sudo systemctl status docker --no-pager || true
-              sudo journalctl -u docker -n 120 --no-pager || true
-              exit 1
-            }
+            retry() { n=0; until "$@"; do n=$((n+1)); [ $n -ge 20 ] && exit 1; sleep 3; done; }
 
-            wait_docker
+            for i in $(seq 1 60); do sudo test -S /var/run/docker.sock && break || sleep 1; done
+            retry sudo docker ps >/dev/null
+
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
 
-            wait_docker && sudo docker compose -f docker-compose.production.yml pull
-            wait_docker && sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
-            wait_docker && sudo docker compose -f docker-compose.production.yml exec -T db bash -lc 'until pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done'
-            wait_docker && sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
-            wait_docker && sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-            wait_docker && sudo docker compose -f docker-compose.production.yml exec -T backend bash -lc 'rm -rf /backend_static/* && cp -r /app/static/. /backend_static/'
-            wait_docker && sudo docker compose -f docker-compose.production.yml exec -T frontend bash -lc 'rm -rf /static/* && cp -r /app/build/static/. /static/'
-            wait_docker && sudo docker compose -f docker-compose.production.yml exec -T gateway sh -lc 'for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1'
+            retry sudo docker compose -f docker-compose.production.yml pull
+            retry sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
+
+            retry sudo docker compose -f docker-compose.production.yml exec -T db bash -lc 'until pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done'
+            retry sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
+            retry sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+            retry sudo docker compose -f docker-compose.production.yml exec -T backend bash -lc 'rm -rf /backend_static/* && cp -r /app/static/. /backend_static/'
+            retry sudo docker compose -f docker-compose.production.yml exec -T frontend bash -lc 'rm -rf /static/* && cp -r /app/build/static/. /static/'
+            retry sudo docker compose -f docker-compose.production.yml exec -T gateway sh -lc 'for i in $(seq 1 60); do wget -qO- http://frontend:9000/ >/dev/null 2>&1 && exit 0 || sleep 1; done; exit 1'
 
             curl -sfI http://127.0.0.1:8000/ >/dev/null
 
