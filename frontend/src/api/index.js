@@ -32,7 +32,7 @@ class Api {
   }
 
   signin({ email, password }) {
-    return fetch("/api/auth/token/login/", {
+    return fetch("/api/token/login/", {
       method: "POST",
       headers: this._headers,
       body: JSON.stringify({
@@ -44,7 +44,7 @@ class Api {
 
   signout() {
     const token = localStorage.getItem("token");
-    return fetch("/api/auth/token/logout/", {
+    return fetch("/api/token/logout/", {
       method: "POST",
       headers: {
         ...this._headers,
