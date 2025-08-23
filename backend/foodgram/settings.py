@@ -11,9 +11,18 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', get_random_secret_key())
 
 DEBUG: bool = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS: list[str] = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h.strip()]
 
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+
+def _csrf_trusted_from_env_or_hosts() -> list[str]:
+    raw = os.getenv('CSRF_TRUSTED_ORIGINS', '').strip()
+    if raw:
+        vals = [v.strip() for v in raw.split(',') if v.strip()]
+        return [v if v.startswith(('http://', 'https://')) else f'https://{v}' for v in vals]
+    return [f'https://{h}' for h in ALLOWED_HOSTS if h and h != '*']
+
+
+CSRF_TRUSTED_ORIGINS = _csrf_trusted_from_env_or_hosts()
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
