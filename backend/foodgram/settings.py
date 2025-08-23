@@ -126,26 +126,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'users.User'
 
-#
-# REST framework configuration
-#
-# We explicitly set a custom pagination class that honours a
-# ``limit`` query parameter.  Without this, DRF will always use
-# ``PAGE_SIZE`` for page size and ignore any ``limit`` parameter sent
-# by the client.  See ``foodgram.pagination.CustomPagination`` for
-# implementation details.  The page size is still defined here for
-# completeness but will only be used when the client does not supply
-# a ``limit``.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',
     ),
-    # Allow anonymous reads by default.  Specific views can override
-    # this behaviour via their ``permission_classes`` attribute.
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',
     ),
-    'DEFAULT_PAGINATION_CLASS': 'foodgram.pagination.CustomPagination',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 6,
 }
 
