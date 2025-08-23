@@ -38,8 +38,7 @@ services:
     restart: always
 
   gateway:
-    image: pavellchemakin/foodgram_gateway:latest
-    env_file: .env
+    image: nginx:1.21-alpine
     volumes:
       - frontend_static:/static
       - media:/media
