@@ -8,4 +8,4 @@ RUN npm install --no-audit --no-fund --legacy-peer-deps
 COPY . .
 RUN npm run build
 
-CMD [ "bash", "-lc", "rm -rf /static/* && cp -r /app/build/static/. /static/ && npx -y http-server -p 9000 /app/build" ]
+CMD [ "bash", "-lc", "rm -rf /static/* && cp -r /app/build/static/. /static/ && npx -y serve -s -l 9000 /app/build" ]
