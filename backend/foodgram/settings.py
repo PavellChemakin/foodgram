@@ -12,6 +12,8 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', get_random_secret_key())
 DEBUG: bool = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h.strip()]
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ['foodgramvm.serveirc.com', 'localhost', '127.0.0.1']
 
 
 def _csrf_trusted_from_env_or_hosts() -> list[str]:
@@ -19,7 +21,10 @@ def _csrf_trusted_from_env_or_hosts() -> list[str]:
     if raw:
         vals = [v.strip() for v in raw.split(',') if v.strip()]
         return [v if v.startswith(('http://', 'https://')) else f'https://{v}' for v in vals]
-    return [f'https://{h}' for h in ALLOWED_HOSTS if h and h != '*']
+    trusted = [f'https://{h}' for h in ALLOWED_HOSTS if h and h != '*']
+    if not trusted:
+        trusted = ['https://foodgramvm.serveirc.com']
+    return trusted
 
 
 CSRF_TRUSTED_ORIGINS = _csrf_trusted_from_env_or_hosts()
