@@ -18,7 +18,8 @@ urlpatterns = [
     # Token authentication endpoints.  We mount the same set of
     # endpoints twice: once under ``/api/`` (resulting in
     # ``/api/token/login/`` and ``/api/token/logout/``) and once under
-    # ``/api/auth/`` (``/api/auth/token/login/`` and ``/api/auth/token/logout/``).
+    # ``/api/auth/`` (``/api/auth/token/login/``
+    # and ``/api/auth/token/logout/``).
     # The latter is kept for backward compatibility with some front‑end
     # clients and is also mapped in the gateway nginx configuration.
     path('api/', include('djoser.urls.authtoken')),
