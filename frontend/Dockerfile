@@ -1,11 +1,7 @@
-FROM node:18
-
+FROM node:21.7.1-alpine
 WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm install --no-audit --no-fund --legacy-peer-deps
-
-COPY . .
+COPY package*.json ./
+RUN npm install
+COPY . ./
 RUN npm run build
-
-CMD [ "bash", "-lc", "rm -rf /static/* && cp -r /app/build/static/. /static/ && npx -y serve -s -l 9000 /app/build" ]
+CMD cp -r build result_build

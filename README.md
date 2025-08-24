@@ -1,115 +1,83 @@
-## Foodgram — приложение для публикации рецептов
+# Foodgram – продуктовый помощник
 
-Этот репозиторий содержит полный проект Foodgram: бэкенд на Django/DRF,
-одностраничный интерфейс на React и инфраструктуру для запуска в
-контейнерах Docker.  Пользователи могут публиковать свои рецепты,
-подписываться на авторов, добавлять понравившиеся блюда в избранное и
-формировать список покупок.
+**Foodgram** – это учебный проект из курса разработчика на Django, представляющий собой сервис для публикации кулинарных рецептов. Пользователи могут создавать и редактировать свои рецепты, подписываться на любимых авторов, добавлять понравившиеся блюда в избранное и формировать список покупок по выбранным рецептам. Проект состоит из back‑end части на Django REST Framework и front‑end приложения на React, упакованных в Docker‑контейнеры и готовых к развёртыванию на удалённом сервере.
 
-### Состав проекта
+## Структура проекта
 
-- **backend/** — исходники Django‑приложения.  Здесь определены
-  модели (`recipes`, `tags`, `ingredients`, `users` и т. д.),
-  сериализаторы, вьюсеты и URL‑маршруты.  Настройки проекта читают
-  параметры из переменных окружения, поэтому для запуска в продакшене
-  необходимо передать секреты через файл `.env`.
-- **frontend/** — исходники SPA на React.  Используется `create‑react‑app`.
-  При сборке приложение компилируется в каталог `build/`, а
-  контейнер `frontend` публикует эту сборку через простой HTTP‑сервер.
-- **nginx/** — конфигурация промежуточного контейнера, который
-  проксирует запросы `/api/` и `/admin/` на бэкенд, раздаёт статику и
-  передаёт остальные запросы на фронтенд.  Конфигурация находится в
-  `nginx/nginx.conf`, а соответствующий Dockerfile — в
-  `nginx/Dockerfile`.
-- **data/** — примеры исходных данных для загрузки ингредиентов
-  (CSV/JSON).  Скрипты миграций предполагают, что ингредиенты будут
-  загружены отдельной командой или через административную панель.
-- **docs/** — спецификация API и документация Redoc.
-- **postman_collection/** — коллекция запросов для Postman.
-- **docker‑compose.yml** — описание сервисов для локальной разработки с
-  использованием образов, опубликованных на Docker Hub.
-- **docker‑compose.production.yml** — описание сервисов для
-  продакшен‑деплоя (идентично `docker‑compose.yml` и используется в CI).
-- **.github/workflows/foodgram_workflow.yml** — GitHub Actions
-  workflow для тестирования, сборки образов и деплоя на удалённый
-  сервер.
-- **.env.example** — пример файла окружения.  Скопируйте его в `.env`
-  и измените значения под свои нужды перед запуском.
+* `backend/` – исходный код back‑end сервиса. Включает Django‑проект, приложения `users`, `recipes` и `api`, файлы миграций, админку и скрипт `manage.py`. Докерфайл описывает сборку образа с Gunicorn.
+* `frontend/` – исходный код React‑клиента. При сборке генерирует каталог `build` с оптимизированными статическими файлами.
+* `data/` – предзагруженные ингредиенты в формате CSV. Их можно загрузить в базу командой `manage.py load_ingredients`.
+* `docs/` – документация API в формате OpenAPI/Redoc.
+* `infra/` – конфигурация инфраструктуры. Содержит `docker-compose.yml` для развёртывания четырёх контейнеров (PostgreSQL, back‑end, front‑end и nginx) и `nginx.conf` для проксирования запросов и раздачи статики.
+* `.github/workflows/` – GitHub Actions workflow для сборки образа, публикации его на Docker Hub, деплоя на удалённый сервер и отправки уведомления в Telegram.
+* `.env.example` – пример файла конфигурации окружения для контейнеров.
 
-### Быстрый старт в Docker
+## Как развернуть Foodgram локально
 
-1.  Скопируйте `.env.example` в `.env` и заполните значения
-    (`SECRET_KEY`, `POSTGRES_PASSWORD` и другие).
-2.  Соберите и запустите сервисы:
+1. Установите [Docker](https://www.docker.com/) и [docker‑compose](https://docs.docker.com/compose/).
+2. Склонируйте репозиторий и перейдите в каталог `infra`:
 
-    ```bash
-    docker compose up -d
-    ```
+   ```bash
+   git clone <YOUR_REPOSITORY_URL> foodgram
+   cd foodgram/infra
+   ```
 
-   Будут подняты четыре контейнера: `db` (PostgreSQL), `backend`
-   (Django + Gunicorn), `frontend` (React) и `gateway` (nginx).  После
-   запуска проект будет доступен по адресу http://127.0.0.1:8000/.
+3. Создайте файл `.env` в каталоге `infra` на основе `.env.example` и заполните его значениями (секретный ключ Django, параметры базы данных и т. д.). Например:
 
-3.  Для применения миграций и загрузки статики выполните:
+   ```env
+   SECRET_KEY=your-secret-key
+   DEBUG=True
+   DB_ENGINE=django.db.backends.postgresql
+   DB_NAME=foodgram
+   POSTGRES_USER=foodgram
+   POSTGRES_PASSWORD=foodgram
+   DB_HOST=db
+   DB_PORT=5432
+   ```
 
-    ```bash
-    docker compose exec backend python manage.py migrate
-    docker compose exec backend python manage.py collectstatic --noinput
-    docker compose exec backend bash -lc "rm -rf /backend_static/* && cp -r /app/static/. /backend_static/"
-    ```
+4. Запустите контейнеры:
 
-4.  (Опционально) Загрузите ингредиенты из файла:
+   ```bash
+   docker-compose up -d --build
+   ```
 
-    ```bash
-    docker compose exec backend python manage.py loaddata /app/data/ingredients.json
-    ```
+5. Примените миграции, создайте суперпользователя и загрузите ингредиенты:
 
-### Настройка CI/CD
+   ```bash
+   docker-compose exec backend python manage.py migrate
+   docker-compose exec backend python manage.py createsuperuser
+   docker-compose exec backend python manage.py collectstatic --no-input
+   docker-compose exec backend python manage.py load_ingredients
+   ```
 
-Для автоматического деплоя проекта на виртуальный сервер используются
-GitHub Actions.  Файл `.github/workflows/foodgram_workflow.yml` содержит
-следующие этапы:
+6. Откройте сайт в браузере по адресу [http://localhost/](http://localhost/) (или по адресу, указанному в `nginx.conf`). Документация API доступна по адресу `http://localhost/api/docs/`.
 
-1. **tests** — проверка стиля кода с помощью flake8 и запуск unit‑тестов
-   бэкенда.  Для фронтенда выполняется `npm run test`, если в проекте
-   присутствуют тесты.  Используется сервис PostgreSQL.
-2. **build_backend**, **build_frontend**, **build_gateway** — сборка и
-   публикация Docker‑образов бэкенда, фронтенда и nginx‑шлюза в Docker
-   Registry.  Имена образов формируются из вашего логина Docker Hub:
-   `${{ secrets.DOCKER_USERNAME }}/foodgram_backend:latest` и т. д.
-3. **cleanup** — подключение к серверу по SSH, остановка старых
-   контейнеров, очистка ресурсов.
-4. **deploy** — копирование файла `docker‑compose.production.yml` на
-   сервер и запуск сервисов.  После успешной публикации выполняются
-   миграции, сборка и копирование статики.
-5. **notify** — отправка уведомления в Telegram о завершении деплоя.
+## Развёртывание на сервере
 
-Для работы CI/CD необходимо добавить в настройки репозитория секреты:
+В репозитории находится GitHub Actions workflow `.github/workflows/main.yml`, который автоматизирует сборку и деплой приложения на ваш сервер. Для его работы необходимо создать секреты в настройках репозитория:
 
-- `HOST` — адрес виртуального сервера;
-- `USER` — имя пользователя для SSH;
-- `SSH_KEY` — приватный SSH‑ключ;
-- `SSH_PASSPHRASE` — пароль к ключу (если используется);
-- `DOCKER_USERNAME` и `DOCKER_PASSWORD` — логин и пароль Docker Hub;
-- `TELEGRAM_TO` и `TELEGRAM_TOKEN` — данные вашего Telegram‑бота для
-  уведомлений.
+* **DOCKER_USERNAME**, **DOCKER_PASSWORD** – учётные данные Docker Hub.
+* **HOST** – публичный IP‑адрес вашего сервера.
+* **USER** – имя пользователя на сервере (например, `yc-user`).
+* **SSH_KEY** – приватный ключ для SSH‑доступа к серверу.
+* **SSH_PASSPHRASE** – пароль к приватному ключу (если установлен).
+* **TELEGRAM_TO**, **TELEGRAM_TOKEN** – данные для отправки уведомлений о деплое в Telegram.
+* **SECRET_KEY**, **DB_ENGINE**, **DB_NAME**, **POSTGRES_USER**, **POSTGRES_PASSWORD**, **DB_HOST**, **DB_PORT** – переменные окружения для приложения.
 
-### Полезные команды для разработки
+После пуша в ветку `main` GitHub Actions выполнит следующие шаги:
 
-Запуск сервера локально (без Docker):
+1. Соберёт образ back‑end приложения и отправит его в Docker Hub под тегом `${{ secrets.DOCKER_USERNAME }}/foodgram_backend:latest`.
+2. Подключится по SSH к серверу, обновит образ, перезапустит контейнеры и заново пересоздаст файл `.env` с заданными параметрами.
+3. Отправит уведомление в Telegram о успешном деплое.
 
-```bash
-python -m venv venv && source venv/bin/activate
-pip install -r backend/requirements.txt
-cd backend
-python manage.py migrate
-python manage.py runserver
-```
+Сервер должен быть настроен на получение входящих запросов по 80‑му порту. Файл `infra/nginx.conf` уже содержит конфигурацию для домена `foodgramvm.serveirc.com` и IP‑адреса `84.252.141.185`. При необходимости замените эти значения на свои.
 
-После запуска API будет доступно на http://127.0.0.1:8000/api/.
+## Замечания по безопасности
 
-### Ссылки
+* **Не добавляйте приватные ключи и пароли в репозиторий.** Файл `.env` должен быть исключён из контроля версий и храниться только на сервере.
+* Настройте DNS‑запись для вашего домена, чтобы он указывал на IP‑адрес сервера.
+* В `settings.py` установите `DEBUG=False` в продакшне и заполните список `ALLOWED_HOSTS` актуальными доменами.
 
-- Исходная спецификация и описание проекта находятся в
-  `docs/openapi-schema.yml` и `docs/redoc.html`.
-- Коллекция запросов для Postman — в каталоге `postman_collection/`.
+## Авторы
+
+Этот репозиторий основан на учебном шаблоне *Foodgram* (Яндекс.Практикум). Финальная версия адаптирована для развёртывания на домене `foodgramvm.serveirc.com` с учётом пользовательских настроек.

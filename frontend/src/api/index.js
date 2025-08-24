@@ -22,27 +22,29 @@ class Api {
           const a = document.createElement("a");
           a.href = url;
           a.download = "shopping-list";
-          document.body.appendChild(a);
+          document.body.appendChild(a); // we need to append the element to the dom -> otherwise it will not work in firefox
           a.click();
-          a.remove();
+          a.remove(); //afterwards we remove the element again
         });
       }
       reject();
     });
   }
 
-  // авторизация: используем стандартные пути djoser /api/token/login/
   signin({ email, password }) {
-    return fetch("/api/token/login/", {
+    return fetch("/api/auth/token/login/", {
       method: "POST",
       headers: this._headers,
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        email,
+        password,
+      }),
     }).then(this.checkResponse);
   }
 
   signout() {
     const token = localStorage.getItem("token");
-    return fetch("/api/token/logout/", {
+    return fetch("/api/auth/token/logout/", {
       method: "POST",
       headers: {
         ...this._headers,
@@ -55,7 +57,13 @@ class Api {
     return fetch(`/api/users/`, {
       method: "POST",
       headers: this._headers,
-      body: JSON.stringify({ email, password, username, first_name, last_name }),
+      body: JSON.stringify({
+        email,
+        password,
+        username,
+        first_name,
+        last_name,
+      }),
     }).then(this.checkResponse);
   }
 
@@ -82,18 +90,35 @@ class Api {
     }).then(this.checkResponse);
   }
 
-  // Заглушки для аватара: в бэкенде нет эндпоинтов users/me/avatar/
-  changeAvatar() {
-    return Promise.resolve();
+  changeAvatar({ file }) {
+    const token = localStorage.getItem("token");
+    return fetch(`/api/users/me/avatar/`, {
+      method: "PUT",
+      headers: {
+        ...this._headers,
+        authorization: `Token ${token}`,
+      },
+      body: JSON.stringify({ avatar: file }),
+    }).then(this.checkResponse);
   }
+
   deleteAvatar() {
-    return Promise.resolve();
+    const token = localStorage.getItem("token");
+    return fetch(`/api/users/me/avatar/`, {
+      method: "DELETE",
+      headers: {
+        ...this._headers,
+        authorization: `Token ${token}`,
+      },
+    }).then(this.checkResponse);
   }
 
   resetPassword({ email }) {
     return fetch(`/api/users/reset_password/`, {
       method: "POST",
-      headers: { ...this._headers },
+      headers: {
+        ...this._headers,
+      },
       body: JSON.stringify({ email }),
     }).then(this.checkResponse);
   }
@@ -144,7 +169,14 @@ class Api {
     }).then(this.checkResponse);
   }
 
-  createRecipe({ name = "", image, tags = [], cooking_time = 0, text = "", ingredients = [] }) {
+  createRecipe({
+    name = "",
+    image,
+    tags = [],
+    cooking_time = 0,
+    text = "",
+    ingredients = [],
+  }) {
     const token = localStorage.getItem("token");
     return fetch("/api/recipes/", {
       method: "POST",
@@ -152,11 +184,22 @@ class Api {
         ...this._headers,
         authorization: `Token ${token}`,
       },
-      body: JSON.stringify({ name, image, tags, cooking_time, text, ingredients }),
+      body: JSON.stringify({
+        name,
+        image,
+        tags,
+        cooking_time,
+        text,
+        ingredients,
+      }),
     }).then(this.checkResponse);
   }
 
-  updateRecipe({ name, recipe_id, image, tags, cooking_time, text, ingredients }, wasImageUpdated) {
+  updateRecipe(
+    { name, recipe_id, image, tags, cooking_time, text, ingredients },
+    wasImageUpdated
+  ) {
+    // image was changed
     const token = localStorage.getItem("token");
     return fetch(`/api/recipes/${recipe_id}/`, {
       method: "PATCH",
@@ -198,9 +241,13 @@ class Api {
     }).then(this.checkResponse);
   }
 
-  // Заглушка: возвращаем ссылку на рецепт, вместо обращения к несуществующему API
   copyRecipeLink({ id }) {
-    return Promise.resolve({ url: `${window.location.origin}/recipes/${id}` });
+    return fetch(`/api/recipes/${id}/get-link/`, {
+      method: "GET",
+      headers: {
+        ...this._headers,
+      },
+    }).then(this.checkResponse);
   }
 
   getUser({ id }) {
@@ -227,6 +274,7 @@ class Api {
   }
 
   // subscriptions
+
   getSubscriptions({ page, limit = 6, recipes_limit = 3 }) {
     const token = localStorage.getItem("token");
     return fetch(
@@ -265,6 +313,7 @@ class Api {
 
   // ingredients
   getIngredients({ name }) {
+    const token = localStorage.getItem("token");
     return fetch(`/api/ingredients/?name=${name}`, {
       method: "GET",
       headers: {
