@@ -149,16 +149,21 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             set -euxo pipefail
-            cd /home/${{ secrets.USER }}/foodgram
-            # Pull updated images
-            sudo docker compose -f docker-compose.production.yml pull
-            # Bring up containers, recreating them if necessary and removing orphaned containers
-            sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
-            # Wait for the database to become ready before running migrations
-            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
-            # Collect static files into the static volume.  With the updated volume mount,
-            # this will place files into /app/backend/static which is already mounted.
-            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+            sudo bash -lc '
+              cd /home/${{ secrets.USER }}/foodgram
+
+              sudo docker compose -f docker-compose.production.yml pull
+              sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
+
+              sudo docker compose -f docker-compose.production.yml exec -T db bash -lc \
+                "until pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1 -p 5432; do sleep 1; done"
+
+              sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py makemigrations users recipes --noinput || true
+              sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py makemigrations --noinput || true
+              sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
+
+              sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+            '
   send_message:
     runs-on: ubuntu-22.04
     needs: deploy
