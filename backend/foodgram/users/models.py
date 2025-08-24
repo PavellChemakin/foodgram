@@ -5,6 +5,13 @@ from django.db import models
 class User(AbstractUser):
     email = models.EmailField(max_length=254, unique=True)
 
+    image = models.ImageField(
+        'Аватар',
+        upload_to='users/',
+        blank=True,
+        null=True
+    )
+
     class Meta:
         ordering = ['id']
         verbose_name = 'Пользователь'

@@ -19,9 +19,17 @@ class TagAdmin(admin.ModelAdmin):
 
 @admin.register(models.Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ('pk', 'name', 'author', 'in_favorites')
-    readonly_fields = ('in_favorites',)
+    list_display = (
+        'pk', 'name', 'author', 'cooking_time',
+        'in_favorites',
+    )
+    search_fields = (
+        'name',
+        'author__username',
+        'author__email',
+    )
     list_filter = ('name', 'author', 'tags')
+    readonly_fields = ('in_favorites',)
     empty_value_display = '-пусто-'
 
     @admin.display(description='В избранном')
