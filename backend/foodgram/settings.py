@@ -5,16 +5,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# The Django secret key must be provided via the environment.  We do
-# not fall back to generating a random key at runtime because this would
-# invalidate existing sessions and tokens whenever the container is
-# restarted.  Instead, explicitly require the environment variable.  See
-# the project audit report for details.
+# Require a secret key in the environment.  Falling back to a random key
+# causes sessions and tokens to break on container restarts and is insecure.
 _secret_key = os.environ.get('DJANGO_SECRET_KEY')
 if not _secret_key:
     raise RuntimeError(
         'DJANGO_SECRET_KEY environment variable is not set. '
-        'Please define a strong secret key in the environment.'
+        'Please define a strong secret key in your .env file.'
     )
 SECRET_KEY = _secret_key
 
@@ -24,9 +21,7 @@ ALLOWED_HOSTS: list[str] = [
     h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h.strip()
 ]
 if not ALLOWED_HOSTS:
-    # Provide a minimal set of hosts for development.  Do not
-    # automatically include the production domain here; that must be
-    # explicitly set via the ALLOWED_HOSTS environment variable.
+    # Default to local hosts only.  Do not hardcode production domains here.
     ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 _raw_csrf = os.getenv('CSRF_TRUSTED_ORIGINS', '').strip()
@@ -99,13 +94,12 @@ WSGI_APPLICATION = 'foodgram.wsgi.application'
 
 
 if os.environ.get('DB_ENGINE'):
+    # Prefer POSTGRES_DB if provided; fallback to DB_NAME for backwards compatibility.
+    db_name = os.environ.get('POSTGRES_DB') or os.environ.get('DB_NAME', 'postgres')
     DATABASES = {
         'default': {
             'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
-            'NAME': (
-                os.environ.get('POSTGRES_DB')
-                or os.environ.get('DB_NAME', 'postgres')
-            ),
+            'NAME': db_name,
             'USER': os.environ.get('POSTGRES_USER', 'postgres'),
             'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
             'HOST': os.environ.get('DB_HOST', 'db'),

@@ -148,13 +148,17 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
+            set -euxo pipefail
             cd /home/${{ secrets.USER }}/foodgram
+            # Pull updated images
             sudo docker compose -f docker-compose.production.yml pull
-            sudo docker compose -f docker-compose.production.yml down
-            sudo docker compose -f docker-compose.production.yml up -d
-            sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate
-            sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
-            sudo docker compose -f docker-compose.production.yml exec backend cp -r /app/static/. /backend_static/static/
+            # Bring up containers, recreating them if necessary and removing orphaned containers
+            sudo docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
+            # Wait for the database to become ready before running migrations
+            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
+            # Collect static files into the static volume.  With the updated volume mount,
+            # this will place files into /app/backend/static which is already mounted.
+            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
   send_message:
     runs-on: ubuntu-22.04
     needs: deploy

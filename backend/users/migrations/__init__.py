@@ -1,9 +1,7 @@
 """
 Initialize the migrations package for the users app.
 
-This file is intentionally left blank.  Django uses the presence of
-this package to discover and track database migrations.  Without an
-empty __init__.py, attempts to run `manage.py makemigrations` or
-`manage.py migrate` may fail because Django cannot find the migrations
-module.
+This file ensures that Django can discover and run migrations for the
+users application.  Without an `__init__.py`, Django would not treat
+the directory as a package and would skip any migration modules.
 """

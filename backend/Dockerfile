@@ -11,6 +11,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . /app
 
-RUN python manage.py collectstatic --noinput
+RUN DJANGO_SECRET_KEY=buildtime-secret DJANGO_DEBUG=False python manage.py collectstatic --noinput
 
 CMD ["gunicorn", "foodgram.wsgi:application", "--bind", "0.0.0.0:8000"]

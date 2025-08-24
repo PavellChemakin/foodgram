@@ -19,9 +19,9 @@ services:
     image: pavellchemakin/foodgram_backend:latest
     env_file: .env
     volumes:
-      # Mount the static volume to Django's STATIC_ROOT (/app/backend/static)
-      - backend_static:/app/backend/static
-      # Mount the media volume to Django's MEDIA_ROOT (/app/backend/media)
+      # Mount the shared static volume at Django's STATIC_ROOT
+      - static:/app/backend/static
+      # Mount the shared media volume at Django's MEDIA_ROOT
       - media:/app/backend/media
     depends_on:
       db:
@@ -34,7 +34,8 @@ services:
     image: pavellchemakin/foodgram_frontend:latest
     env_file: .env
     volumes:
-      - frontend_static:/static
+      # Mount the shared static volume into /static so the build artifacts can be served
+      - static:/static
     expose: ["9000"]
     networks: [foodgram_net]
     restart: always
@@ -43,8 +44,10 @@ services:
     image: pavellchemakin/foodgram_gateway:latest
     env_file: .env
     volumes:
-      - frontend_static:/static:ro
-      - media:/media:ro
+      # Serve static files and media files directly from volumes. Do not mount as read-only
+      - static:/static
+      - media:/media
+      # Nginx configuration and SSL certificates remain read-only
       - ./infra/gateway/default.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt/live/foodgramvm.serveirc.com/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
       - /etc/letsencrypt/live/foodgramvm.serveirc.com/privkey.pem:/etc/nginx/certs/privkey.pem:ro
@@ -58,8 +61,7 @@ services:
 
 volumes:
   pg_data:
-  backend_static:
-  frontend_static:
+  static:
   media:
 
 networks:
