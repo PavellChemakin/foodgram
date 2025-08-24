@@ -6,12 +6,16 @@ from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
+    # Admin site
     path('admin/', admin.site.urls),
 
+    # Djoser authentication endpoints live under /api/auth/ to avoid
+    # conflicting with application routes.  See audit notes on URL
+    # duplication.
+    path('api/auth/', include('djoser.urls')),
     path('api/auth/', include('djoser.urls.authtoken')),
 
-    path('api/', include('djoser.urls')),
-    path('api/', include('djoser.urls.authtoken')),
+    # Application-specific routes
     path('api/', include('recipes.urls')),
     path('api/', include('users.urls')),
 ]

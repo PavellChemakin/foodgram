@@ -1,3 +1,5 @@
+version: '2.4'
+
 services:
   db:
     image: postgres:13
@@ -17,8 +19,10 @@ services:
     image: pavellchemakin/foodgram_backend:latest
     env_file: .env
     volumes:
-      - backend_static:/backend_static
-      - media:/media
+      # Mount the static volume to Django's STATIC_ROOT (/app/backend/static)
+      - backend_static:/app/backend/static
+      # Mount the media volume to Django's MEDIA_ROOT (/app/backend/media)
+      - media:/app/backend/media
     depends_on:
       db:
         condition: service_healthy
