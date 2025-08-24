@@ -52,19 +52,38 @@ jobs:
             set -e
             cd /home/${{ secrets.USER }}/foodgram/infra
 
-            # обновим репозиторий, если есть .git
+            # обновим репо (если есть)
             if [ -d ../.git ]; then
               cd ..
-              git pull || true
+              sudo git pull || true
               cd infra
             fi
 
-            # прод-стек из Docker Hub
+            # нормализуем файлы (CRLF) и подготовим .env
+            sudo sed -i 's/\r$//' docker-compose.production.yml || true
+            sudo sed -i 's/\r$//' nginx.production.conf || true
+
+            sudo rm -f .env
+            sudo touch .env
+            printf "SECRET_KEY=%s\n"            "${{ secrets.SECRET_KEY }}"      | sudo tee -a .env >/dev/null
+            printf "DEBUG=%s\n"                 "False"                           | sudo tee -a .env >/dev/null
+            printf "DB_ENGINE=%s\n"             "${{ secrets.DB_ENGINE }}"        | sudo tee -a .env >/dev/null
+            printf "DB_NAME=%s\n"               "${{ secrets.DB_NAME }}"          | sudo tee -a .env >/dev/null
+            printf "POSTGRES_USER=%s\n"         "${{ secrets.POSTGRES_USER }}"    | sudo tee -a .env >/dev/null
+            printf "POSTGRES_PASSWORD=%s\n"     "${{ secrets.POSTGRES_PASSWORD }}"| sudo tee -a .env >/dev/null
+            printf "DB_HOST=%s\n"               "${{ secrets.DB_HOST }}"          | sudo tee -a .env >/dev/null
+            printf "DB_PORT=%s\n"               "${{ secrets.DB_PORT }}"          | sudo tee -a .env >/dev/null
+            printf "DOCKER_USERNAME=%s\n"       "${{ secrets.DOCKER_USERNAME }}"  | sudo tee -a .env >/dev/null
+
+            # диагностика — какие образы подставятся
+            sudo docker-compose -f docker-compose.production.yml config | awk '/image:/{print}'
+
+            # деплой
             sudo docker-compose -f docker-compose.production.yml down
             sudo docker-compose -f docker-compose.production.yml pull
             sudo docker-compose -f docker-compose.production.yml up -d --build
 
-            # миграции/статика/ингредиенты
+            # миграции/статика/данные
             sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py migrate
             sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --no-input
             sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py load_ingredients
