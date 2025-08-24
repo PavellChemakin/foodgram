@@ -1,9 +1,13 @@
 FROM node:18-alpine AS build
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
 COPY . .
-RUN npm run build
+RUN yarn build
 
 FROM nginx:1.25-alpine
 COPY --from=build /app/build/ /usr/share/nginx/html/
