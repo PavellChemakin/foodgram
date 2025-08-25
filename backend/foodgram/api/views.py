@@ -15,11 +15,12 @@ from foodgram.settings import FILE_NAME
 from .filters import RecipeFilter
 from .pagination import CustomPaginator
 from .permissions import IsAuthorOrReadOnly
-from .serializers import (IngredientSerializer, RecipeCreateSerializer,
-                          RecipeReadSerializer, RecipeSerializer,
-                          SetPasswordSerializer, SubscribeAuthorSerializer,
-                          SubscriptionsSerializer, TagSerializer,
-                          UserCreateSerializer, UserReadSerializer)
+from .serializers import (AvatarSerializer, IngredientSerializer,
+                          RecipeCreateSerializer, RecipeReadSerializer,
+                          RecipeSerializer, SetPasswordSerializer,
+                          SubscribeAuthorSerializer, SubscriptionsSerializer,
+                          TagSerializer, UserCreateSerializer,
+                          UserReadSerializer)
 
 
 class UserViewSet(mixins.CreateModelMixin,
@@ -73,6 +74,23 @@ class UserViewSet(mixins.CreateModelMixin,
                               author=author).delete()
             return Response({'detail': 'Успешная отписка'},
                             status=status.HTTP_204_NO_CONTENT)
+        
+    @action(detail=False, methods=['put'], url_path='me/avatar',
+            permission_classes=(IsAuthenticated,))
+    def change_avatar(self, request):
+        serializer = AvatarSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(request.user, serializer.validated_data)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['delete'], url_path='me/avatar',
+            permission_classes=(IsAuthenticated,))
+    def delete_avatar(self, request):
+        if request.user.image:
+            request.user.image.delete(save=False)
+        request.user.image = None
+        request.user.save(update_fields=['image'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class IngredientViewSet(mixins.ListModelMixin,

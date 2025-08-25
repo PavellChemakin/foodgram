@@ -56,6 +56,18 @@ class UserCreateSerializer(UserCreateSerializer):
         return obj
 
 
+class AvatarSerializer(serializers.Serializer):
+    avatar = Base64ImageField(required=True)
+
+    def update(self, instance, validated_data):
+        instance.image = validated_data.get('avatar')
+        instance.save(update_fields=['image'])
+        return instance
+
+    def create(self, validated_data):
+        raise NotImplementedError
+
+
 class SetPasswordSerializer(serializers.Serializer):
     """[POST] Изменение пароля пользователя."""
 
