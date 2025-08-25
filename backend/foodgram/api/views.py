@@ -35,21 +35,14 @@ class UserViewSet(mixins.CreateModelMixin,
             return UserReadSerializer
         return UserCreateSerializer
 
-    @action(detail=False, methods=['get'],
-            pagination_class=None,
-            permission_classes=(IsAuthenticated,))
-    def me(self, request):
-        serializer = UserReadSerializer(request.user)
-        return Response(serializer.data,
-                        status=status.HTTP_200_OK)
-
     @action(detail=False, methods=['post'],
             permission_classes=(IsAuthenticated,))
     def set_password(self, request):
-        serializer = SetPasswordSerializer(request.user, data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.save()
-        return Response({'detail': 'Пароль успешно изменен!'},
+        serializer = SetPasswordSerializer(
+            request.user, data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'detail': 'Пароль изменен успешно.'},
                         status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['get'],
@@ -96,8 +89,8 @@ class IngredientViewSet(mixins.ListModelMixin,
 class TagViewSet(mixins.ListModelMixin,
                  mixins.RetrieveModelMixin,
                  viewsets.GenericViewSet):
-    permission_classes = (AllowAny, )
     queryset = Tag.objects.all()
+    permission_classes = (AllowAny, )
     serializer_class = TagSerializer
     pagination_class = None
 
@@ -105,15 +98,16 @@ class TagViewSet(mixins.ListModelMixin,
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     pagination_class = CustomPaginator
-    permission_classes = (IsAuthorOrReadOnly, )
-    filter_backends = (DjangoFilterBackend, )
+    filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
-    http_method_names = ['get', 'post', 'patch', 'create', 'delete']
+    permission_classes = (IsAuthorOrReadOnly, )
 
     def get_serializer_class(self):
+        if self.request.method in ('POST', 'PATCH'):
+            return RecipeCreateSerializer
         if self.action in ('list', 'retrieve'):
             return RecipeReadSerializer
-        return RecipeCreateSerializer
+        return RecipeSerializer
 
     @action(detail=True, methods=['post', 'delete'],
             permission_classes=(IsAuthenticated,))
@@ -135,12 +129,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if request.method == 'DELETE':
             get_object_or_404(Favorite, user=request.user,
                               recipe=recipe).delete()
-            return Response({'detail': 'Рецепт успешно удален из избранного.'},
-                            status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {'detail': 'Рецепт успешно удален из избранного.'},
+                status=status.HTTP_204_NO_CONTENT
+            )
 
     @action(detail=True, methods=['post', 'delete'],
-            permission_classes=(IsAuthenticated,),
-            pagination_class=None)
+            permission_classes=(IsAuthenticated,))
     def shopping_cart(self, request, **kwargs):
         recipe = get_object_or_404(Recipe, id=kwargs['pk'])
 
@@ -163,6 +158,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 {'detail': 'Рецепт успешно удален из списка покупок.'},
                 status=status.HTTP_204_NO_CONTENT
             )
+
+    @action(detail=True, methods=['get'], permission_classes=(AllowAny,),
+            url_path='get-link')
+
+    def get_link(self, request, **kwargs):
+        recipe_id = kwargs.get('pk')
+        link = f"{request.scheme}://{request.get_host()}/recipes/{recipe_id}"
+        return Response({"short-link": link}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'],
             permission_classes=(IsAuthenticated,))
