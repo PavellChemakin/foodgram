@@ -74,7 +74,7 @@ class UserViewSet(mixins.CreateModelMixin,
                               author=author).delete()
             return Response({'detail': 'Успешная отписка'},
                             status=status.HTTP_204_NO_CONTENT)
-        
+
     @action(detail=False, methods=['put'], url_path='me/avatar',
             permission_classes=(IsAuthenticated,))
     def change_avatar(self, request):
@@ -179,7 +179,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], permission_classes=(AllowAny,),
             url_path='get-link')
-
     def get_link(self, request, **kwargs):
         recipe_id = kwargs.get('pk')
         link = f"{request.scheme}://{request.get_host()}/recipes/{recipe_id}"
